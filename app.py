@@ -205,6 +205,7 @@ def save_tasnia():
         weight_bakr=data.get("weight_bakr")
         ishager=data.get("hanger")
         shrit=data.get("shrit")
+        old_price=data.get("old_price")
         
         (height,width,tasnia_value,price,weight,weight_bakr)
 
@@ -239,9 +240,9 @@ def save_tasnia():
                     "shrit": shrit,
                 }).execute()
 
-        ("saved1")
-        supabase.table("storage_bakar").update({"weight": new_weight}).eq("hight", int(height)).execute()
-        ("saved2")
+        
+        response1=supabase.table("storage_bakar").update({"weight": new_weight}).eq("hight", int(height)).eq("price", old_price).execute()
+        
         return jsonify({"message": "Data saved successfully", "total_value": total_value})
 
 @app.route('/storage_mtsanaa')
@@ -482,5 +483,3 @@ def update_ager(id):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
-
-
