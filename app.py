@@ -156,7 +156,7 @@ def store_customer_data(data):
 @app.route('/get-storage', methods=['GET'])
 def get_storage():
     try:
-        response = supabase.table("storage_bakar").select("hight, weight").gt("weight", 0).order("hight").execute()
+        response = supabase.table("storage_bakar").select("hight, weight,price").gt("weight", 0).order("hight").execute()
         return jsonify({"data": response.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
