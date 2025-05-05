@@ -14,7 +14,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 @app.route('/get-dropdown-options', methods=['GET'])
 def get_dropdown_options():
     try:
-        response = supabase.table("bakar").select("height").execute()
+        response = supabase.table("bakar").select("height").order("height").execute()
         data = response.data  # Make sure response.data is a list of dictionaries
         ("Raw API Response:", data)  # Debugging line
         
@@ -65,9 +65,9 @@ def store_bakar(data):
     for item in items:
             height = item["dropdown_value"]
             new_weight = float(item["text_input"])  # Convert to float for addition
-            (height,new_weight)
+            
             # Check if the height already exists in the table
-            response = supabase.table("storage_bakar").select("weight").eq("hight", int(height)).execute()
+            response = supabase.table("storage_bakar").select("weight").eq("hight", int(height)).eq("price",price).execute()
 
             existing_data = response.data
             
@@ -76,7 +76,7 @@ def store_bakar(data):
                 existing_weight = float(existing_data[0]["weight"])
                 updated_weight = existing_weight + new_weight
                 
-                supabase.table("storage_bakar").update({"weight": updated_weight}).eq("hight", height).execute()
+                supabase.table("storage_bakar").update({"weight": updated_weight}).eq("hight", height).eq("price",price).execute()
             
             else:
                 # If height doesn't exist, insert a new row
@@ -94,6 +94,8 @@ def store_moshtarayat_Masarif(data):
     date = datetime.datetime.today().strftime("%Y-%m-%d")
     dofaa = data.get("madfoa","")
     factory = data.get("factory", "")
+    lazk_qnty=data.get("lazk_quantity")
+    lazk_price=data.get("lazk_price")
     customer_id = supabase.table("customers").select("customer_id").eq("customer_id", factory).execute()
     customer_id = customer_id.data[0]["customer_id"]
 
@@ -104,6 +106,13 @@ def store_moshtarayat_Masarif(data):
                     "notes":" "
                 }).execute()
     mission_seq=res.data[0]["mission_seq"]
+    res=supabase.table("moshtarayat").insert({
+                "mission_seq":mission_seq,
+                "lazk_qnty":lazk_qnty,
+                "price": lazk_price,
+                "customer_id":customer_id,
+                "date":date
+            }).execute()
 
     for item in items:
             height = item["dropdown_value"]
@@ -126,17 +135,19 @@ def store_customer_data(data):
         factory = data.get("factory", "")
         madfoa=data.get("madfoa")
 
-        total_weight = sum(float(item["text_input"]) for item in items)  # Sum of all weights
+        
 
-        total_price = total_weight * price  # Calculate total price
-
+        total_price = data.get("total")  # Calculate total price
+        
+        
         # Fetch the current "ager" value
         customer_data = supabase.table("customers").select("ager").eq("customer_id", factory).execute()
         current_ager = float(customer_data.data[0]["ager"]) if customer_data.data and customer_data.data[0]["ager"] else 0
-        current_ager = current_ager - float(madfoa)
+        current_ager = current_ager + float(madfoa)
+
 
         # Add the new total price to the existing "ager"
-        new_ager_value = current_ager + total_price
+        new_ager_value = current_ager - float(total_price)
 
         # Update the "ager" column
         supabase.table("customers").update({"ager": new_ager_value}).eq("customer_id", factory).execute()
