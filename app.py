@@ -16,7 +16,7 @@ def get_dropdown_options():
     try:
         response = supabase.table("bakar").select("height").execute()
         data = response.data  # Make sure response.data is a list of dictionaries
-        print("Raw API Response:", data)  # Debugging line
+        ("Raw API Response:", data)  # Debugging line
         
         if isinstance(data, list):
             options = [str(item["height"]) for item in data]  # Ensure conversion to strings
@@ -33,7 +33,7 @@ def get_dropdown_options():
 def get_new_dropdown_options():
     try:
         zbon_or_not = request.args.get('zbon_or_not', default='0')  # Get from query string, default to 0
-        print("Received zbon_or_not:", zbon_or_not)  # Debug log
+        ("Received zbon_or_not:", zbon_or_not)  # Debug log
 
         response = supabase.table("customers") \
             .select("customer_id, customer_name") \
@@ -41,7 +41,7 @@ def get_new_dropdown_options():
             .execute()
         
         data = response.data
-        print("Raw API Response:", data)
+        ("Raw API Response:", data)
         
         return jsonify({"options": data})
     except Exception as e:
@@ -52,7 +52,7 @@ def get_new_dropdown_options():
 @app.route('/save-inputs', methods=['POST'])
 def save_inputs():
     data = request.json  # Receive JSON data
-    print("Received Data:", data)  # Debugging
+    ("Received Data:", data)  # Debugging
     items = data.get("items", [])  # List of items
     store_bakar(data)
     store_customer_data(data)
@@ -65,7 +65,7 @@ def store_bakar(data):
     for item in items:
             height = item["dropdown_value"]
             new_weight = float(item["text_input"])  # Convert to float for addition
-            print(height,new_weight)
+            (height,new_weight)
             # Check if the height already exists in the table
             response = supabase.table("storage_bakar").select("weight").eq("hight", int(height)).execute()
 
@@ -169,9 +169,9 @@ def get_tasnia_value():
         return jsonify({"error": "Height parameter is missing"}), 400
 
     try:
-        print(float(height))
+        (float(height))
         response = supabase.table("bakar").select("height_after_tasnia").eq("height", int(float(height))).execute()
-        print(response.data)
+        (response.data)
 
         if response.data:
             return jsonify({"height_after_tasnia": response.data[0]["height_after_tasnia"]})
@@ -195,7 +195,7 @@ def save_tasnia():
         ishager=data.get("hanger")
         shrit=data.get("shrit")
         
-        print(height,width,tasnia_value,price,weight,weight_bakr)
+        (height,width,tasnia_value,price,weight,weight_bakr)
 
         if height is None or width is None or tasnia_value is None or price is None  or weight is None or weight_bakr is None:
             return jsonify({"error": "Missing required fields"}), 400
@@ -204,7 +204,7 @@ def save_tasnia():
 
         # Perform the calculation
         total_value = width * tasnia_value
-        print(new_weight)
+        (new_weight)
 
         response = supabase.table("storage_mtsanaa").select("weight").eq("height_after_tasniaa", float(tasnia_value)).eq("width", float(width)).eq("hanger", ishager).eq("shrit",shrit).execute()
 
@@ -228,9 +228,9 @@ def save_tasnia():
                     "shrit": shrit,
                 }).execute()
 
-        print("saved1")
+        ("saved1")
         supabase.table("storage_bakar").update({"weight": new_weight}).eq("hight", int(height)).execute()
-        print("saved2")
+        ("saved2")
         return jsonify({"message": "Data saved successfully", "total_value": total_value})
 
 @app.route('/storage_mtsanaa')
@@ -309,7 +309,7 @@ def delete_order():
     data = request.json
     mission_seq = data.get('mission_seq')
     total_price = data.get('total_price')  # Assuming you pass the total price in the request
-    print(total_price)
+
 
     try:
          # Retrieve the current dofaa value for the given mission_seq
@@ -345,12 +345,20 @@ def update_order_weights():
     mission_seq = data.get('mission_seq')
     updated_details = data.get('updated_details', [])
     total_price = data.get('total_price')  # Assuming you pass the total price in the request
-    print(total_price)
+    
     try:
-        order = supabase.table('orders').select('dofaa').match({"mission_seq": mission_seq}).execute()
-
+        order = supabase.table('orders').select('dofaa','Customer_id').match({"mission_seq": mission_seq}).execute()
+        customer_id = order.data[0].get('Customer_id', None)
+        ager_select = supabase.table('customers').select('ager').match({"customer_id": customer_id}).execute()
+        ager = ager_select.data[0].get('ager', None)
+        updated_ager = ager + total_price
+        supabase.table('customers').update({"ager": updated_ager}).match({
+                    "customer_id": customer_id,
+                }).execute()
+        
         if order.data:  # If the order exists
             dofaa_value = order.data[0].get('dofaa', None)
+            customer_id = order.data[0].get('customer_id', None)
 
             if dofaa_value is None:  # If dofaa is NULL, update it with the total_price
                 supabase.table('orders').update({"dofaa": total_price}).match({
@@ -397,7 +405,6 @@ def subtract_from_storage():
     updated = []
     try:
         for item in data:
-            print(item.get("shipped_weight"))
             result = supabase.rpc("subtract_storage_weight", {
                 "width_param": item.get("width"),
                 "height_param": item.get("hight_after_tasniaa"),
@@ -424,6 +431,43 @@ def subtract_from_storage():
     return jsonify({"status": "success", "updated": updated}), 200
 
 
+@app.route('/customers', methods=['GET'])
+def get_customers():
+    res = supabase.table('customers').select('*').execute()
+    sorted_customers = sorted(res.data, key=lambda x: (
+        x['zbon_or_not'],  # False (0) sorts first, so we invert
+        x['ager'] == 0,        # Zeros get sorted after (True > False)
+        -x['ager']             # Sort non-zero descending
+    ))
+    return jsonify(sorted_customers)
+
+@app.route('/customers', methods=['POST'])
+def add_customer():
+    data = request.json
+    res = supabase.table('customers').insert(data).execute()
+    return jsonify(res.data)
+
+@app.route('/customers/<id>/ager', methods=['PATCH'])
+def update_ager(id):
+    try:
+        change = int(request.json.get('change'))
+        res = supabase.table('customers').select('ager').eq('customer_id', id).execute()
+        
+        if not res.data:
+            return jsonify({"error": "Customer not found"}), 404
+            
+        current_ager = res.data[0]['ager']
+        new_ager = current_ager + change
+        
+        update_res = supabase.table('customers').update({'ager': new_ager}).eq('customer_id', id).execute()
+        
+        if update_res.data:
+            return jsonify({"new_ager": new_ager})
+        else:
+            return jsonify({"error": "Update failed"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
