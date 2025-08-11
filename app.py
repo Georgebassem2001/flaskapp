@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import Flask,request,jsonify
 from supabase import create_client, Client
 from flask_cors import CORS
@@ -481,5 +482,123 @@ def update_ager(id):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
+
+@app.route('/weight-comparison')
+def weight_comparison():
+
+    # ✅ Get and group order_details
+    response1 = supabase.table("order_details").select("*").gt("wight", 0).order("width").order("hight_after_tasniaa").execute()
+    data1 = response1.data
+    
+    orders_grouped = defaultdict(float)
+    for row in data1:
+        key = (row['hight_after_tasniaa'], row['width'], row['hanger'], row['shrit'])
+        orders_grouped[key] += row.get('wight', 0)
+
+    # ✅ Get and group storage_mtsanaa
+    response2 = supabase.table("storage_mtsanaa").select("*").order("width").order("height_after_tasniaa").execute()
+    data2 = response2.data
+    
+    storage_grouped = defaultdict(float)
+    for row in data2:
+        key = (row['height_after_tasniaa'], row['width'], row['hanger'], row['shrit'])
+        storage_grouped[key] += row.get('weight', 0)
+
+    # ✅ Combine and filter: only if order weight > storage
+    combined = []
+    all_keys = set(orders_grouped.keys()).intersection(storage_grouped.keys())
+
+    for key in all_keys:
+        weight_orders = orders_grouped.get(key, 0)
+        weight_storage = storage_grouped.get(key, 0)
+
+        if weight_orders > weight_storage:
+            hight, width, hanger, shrit = key
+            combined.append({
+                "hight": hight,
+                "width": width,
+                "hanger": hanger,
+                "shrit": shrit,
+                "weight_orders": weight_orders,
+                "weight_storage": weight_storage,
+            })
+
+    # ✅ Sort result by width and height
+    combined.sort(key=lambda x: (x['width'], x['hight']))
+
+    return jsonify(combined)
+
+@app.route('/get-bakar-height')
+def get_bakar_height():
+    response = supabase.table("bakar").select("height,height_after_tasnia").execute()
+    data = response.data
+
+    mapping = {row['height_after_tasnia']: row['height'] for row in data}
+    return jsonify(mapping)
+
+@app.route('/needed-bakar-weight', methods=['GET'])
+def needed_bakar_weight():
+    # Fetch all relevant tables
+    orders = supabase.table("order_details").select("*").gt("wight", 0).execute().data
+    storage_mtsanaa = supabase.table("storage_mtsanaa").select("*").execute().data
+    bakar = supabase.table("bakar").select("*").execute().data
+    storage_bakar = supabase.table("storage_bakar").select("*").execute().data
+
+    result = {}
+    bakar_storage_weights = {}
+
+    # Step 1: Calculate needed weight per bakar height
+    for order in orders:
+        matching_storage = [
+            s for s in storage_mtsanaa
+            if s["height_after_tasniaa"] == order["hight_after_tasniaa"]
+            and s["width"] == order["width"]
+            and s["hanger"] == order["hanger"]
+            and s["shrit"] == order["shrit"]
+        ]
+
+        total_storage_weight = sum(s["weight"] for s in matching_storage)
+        needed_weight = order["wight"] - total_storage_weight
+
+        if needed_weight > 0:
+            bakar_match = next(
+                (b for b in bakar if b["height_after_tasnia"] == order["hight_after_tasniaa"]),
+                None
+            )
+            if bakar_match:
+                height = bakar_match["height"]
+                if height not in result:
+                    result[height] = {
+                        "hight": height,
+                        "needed_weight": 0
+                    }
+                result[height]["needed_weight"] += needed_weight
+
+    # Step 2: Calculate total weight available in storage_bakar grouped by height
+    for row in storage_bakar:
+        height = row["hight"]
+        weight = row.get("weight", 0)
+        if height not in bakar_storage_weights:
+            bakar_storage_weights[height] = 0
+        bakar_storage_weights[height] += weight
+
+    # Step 3: Subtract available weight from needed weight
+    final_result = []
+    for height, data in result.items():
+        available = bakar_storage_weights.get(height, 0)
+        actual_needed = data["needed_weight"] - available
+        if actual_needed > 0:
+            final_result.append({
+                "hight": height,
+                "needed_weight": round(actual_needed, 2)
+            })
+
+    # Step 4: Sort and return
+    sorted_result = sorted(final_result, key=lambda x: x["hight"])
+    return jsonify(sorted_result)
+
+
 if __name__ == "__main__":
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
+    
